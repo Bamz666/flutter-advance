@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:eatik_app/core/error/result.dart';
+import 'package:eatik_app/features/menu/data/datasources/menu_fake_remote_data_source.dart';
 import 'package:eatik_app/features/menu/data/repositories/menu_repository_impl.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
-import 'package:eatik_app/features/menu/domain/repositories/menu_repository.dart';
+import 'package:eatik_app/features/menu/domain/usecases/get_menus.dart';
 import 'package:eatik_app/features/menu/presentation/widgets/menu_card.dart';
 import 'package:flutter/material.dart';
 
@@ -14,10 +16,15 @@ class MenuPage extends StatefulWidget {
 }
 
 class _MenuPageState extends State<MenuPage> {
-  final MenuRepository _repository = const MenuRepositoryImpl();
+  // Sementara: dependency dibuat langsung di sini (hard dependency).
+  // Akan dirapikan dengan Riverpod (Modul 2) dan DI (Modul 3).
+  final GetMenus _getMenus = const GetMenus(
+    MenuRepositoryImpl(MenuFakeRemoteDataSource()),
+  );
 
   List<Menu> _menus = const [];
   bool _sedangMemuat = true;
+  String? _pesanError;
   String _kataKunci = '';
   KategoriMenu? _kategori;
 
@@ -28,17 +35,22 @@ class _MenuPageState extends State<MenuPage> {
   }
 
   Future<void> _muat() async {
-    setState(() => _sedangMemuat = true);
+    setState(() {
+      _sedangMemuat = true;
+      _pesanError = null;
+    });
 
-    final hasil = await _repository.getMenus(
-      nama: _kataKunci,
-      kategori: _kategori,
-    );
+    final hasil = await _getMenus(nama: _kataKunci, kategori: _kategori);
 
     if (!mounted) return;
     setState(() {
-      _menus = hasil;
       _sedangMemuat = false;
+      switch (hasil) {
+        case Success(:final data):
+          _menus = data;
+        case Failed(:final failure):
+          _pesanError = failure.message;
+      }
     });
   }
 
@@ -104,14 +116,52 @@ class _MenuPageState extends State<MenuPage> {
     if (_sedangMemuat) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final pesan = _pesanError;
+    if (pesan != null) {
+      return _PesanError(pesan: pesan, onCobaLagi: () => unawaited(_muat()));
+    }
+
     if (_menus.isEmpty) {
       return const Center(child: Text('Menu tidak ditemukan'));
     }
+
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       itemCount: _menus.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) => MenuCard(menu: _menus[index]),
+    );
+  }
+}
+
+class _PesanError extends StatelessWidget {
+  const _PesanError({required this.pesan, required this.onCobaLagi});
+
+  final String pesan;
+  final VoidCallback onCobaLagi;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 48, color: scheme.outline),
+            const SizedBox(height: 16),
+            Text(pesan, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.tonal(
+              onPressed: onCobaLagi,
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
