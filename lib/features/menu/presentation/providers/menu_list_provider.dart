@@ -1,7 +1,7 @@
 import 'package:eatik_app/core/error/result.dart';
+import 'package:eatik_app/features/menu/di/menu_dependencies.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_filter_provider.dart';
-import 'package:eatik_app/features/menu/presentation/providers/menu_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MenuListNotifier extends AsyncNotifier<List<Menu>> {
