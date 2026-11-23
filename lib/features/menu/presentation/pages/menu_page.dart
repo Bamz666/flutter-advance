@@ -1,22 +1,35 @@
 import 'dart:async';
 
+import 'package:eatik_app/core/widgets/async_value_view.dart';
+import 'package:eatik_app/core/widgets/state_message.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
+import 'package:eatik_app/features/menu/presentation/menu_labels.dart';
 import 'package:eatik_app/features/menu/presentation/providers/favorit_menu_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_filter_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_list_provider.dart';
-import 'package:eatik_app/features/menu/presentation/providers/menu_list_state.dart';
+import 'package:eatik_app/features/menu/presentation/widgets/antrian_chip.dart';
 import 'package:eatik_app/features/menu/presentation/widgets/menu_card.dart';
+import 'package:eatik_app/features/menu/presentation/widgets/menu_detail_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class MenuPage extends ConsumerWidget {
   const MenuPage({super.key});
 
+  void _tampilkanDetail(BuildContext context, int menuId) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => MenuDetailSheet(menuId: menuId),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final menuState = ref.watch(menuListProvider);
+    final menus = ref.watch(menuListProvider);
 
-    // ref.listen: efek samping (SnackBar) tanpa rebuild.
     ref.listen(favoritMenuProvider, (previous, next) {
       final bertambah = next.length > (previous?.length ?? 0);
       ScaffoldMessenger.of(context)
@@ -32,7 +45,10 @@ class MenuPage extends ConsumerWidget {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Menu Eatik')),
+      appBar: AppBar(
+        title: const Text('Menu Eatik'),
+        actions: const [AntrianChip()],
+      ),
       body: Column(
         children: [
           Padding(
@@ -52,25 +68,44 @@ class MenuPage extends ConsumerWidget {
             ),
           ),
           const _KategoriChips(),
-          Expanded(child: _DaftarMenu(state: menuState)),
+          if (menus.isLoading && menus.hasValue)
+            const LinearProgressIndicator(minHeight: 2),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: ref.read(menuListProvider.notifier).muatUlang,
+              child: AsyncValueView<List<Menu>>(
+                value: menus,
+                isEmpty: (daftar) => daftar.isEmpty,
+                empty: const StateMessage(
+                  icon: Icons.search_off_rounded,
+                  title: 'Menu tidak ditemukan',
+                  message: 'Coba kata kunci atau kategori lain.',
+                ),
+                onRetry: () => ref.invalidate(menuListProvider),
+                builder: (daftar) => ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  itemCount: daftar.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final menu = daftar[index];
+                    return MenuCard(
+                      menu: menu,
+                      onTap: () => _tampilkanDetail(context, menu.id),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Consumer terpisah dengan select: hanya chip yang di-rebuild
-/// saat kategori berubah.
 class _KategoriChips extends ConsumerWidget {
   const _KategoriChips();
-
-  String _label(KategoriMenu? kategori) {
-    return switch (kategori) {
-      null => 'Semua',
-      KategoriMenu.makanan => 'Makanan',
-      KategoriMenu.minuman => 'Minuman',
-    };
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -87,7 +122,7 @@ class _KategoriChips extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
-                label: Text(_label(kategori)),
+                label: Text(kategori?.label ?? 'Semua'),
                 selected: terpilih == kategori,
                 onSelected: (_) => ref
                     .read(menuFilterProvider.notifier)
@@ -95,70 +130,6 @@ class _KategoriChips extends ConsumerWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _DaftarMenu extends ConsumerWidget {
-  const _DaftarMenu({required this.state});
-
-  final MenuListState state;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (state.sedangMemuat && state.menus.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    final pesan = state.pesanError;
-    if (pesan != null) {
-      return _PesanError(
-        pesan: pesan,
-        onCobaLagi: () =>
-            unawaited(ref.read(menuListProvider.notifier).muatUlang()),
-      );
-    }
-
-    if (state.menus.isEmpty) {
-      return const Center(child: Text('Menu tidak ditemukan'));
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      itemCount: state.menus.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => MenuCard(menu: state.menus[index]),
-    );
-  }
-}
-
-class _PesanError extends StatelessWidget {
-  const _PesanError({required this.pesan, required this.onCobaLagi});
-
-  final String pesan;
-  final VoidCallback onCobaLagi;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.cloud_off_rounded, size: 48, color: scheme.outline),
-            const SizedBox(height: 16),
-            Text(pesan, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.tonal(
-              onPressed: onCobaLagi,
-              child: const Text('Coba Lagi'),
-            ),
-          ],
-        ),
       ),
     );
   }

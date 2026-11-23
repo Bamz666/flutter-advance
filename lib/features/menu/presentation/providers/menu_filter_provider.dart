@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +15,20 @@ class MenuFilter extends Equatable {
 }
 
 class MenuFilterNotifier extends Notifier<MenuFilter> {
+  Timer? _debounce;
+
   @override
-  MenuFilter build() => const MenuFilter();
+  MenuFilter build() {
+    ref.onDispose(() => _debounce?.cancel());
+    return const MenuFilter();
+  }
 
   void ubahKataKunci(String value) {
-    state = MenuFilter(kataKunci: value, kategori: state.kategori);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (!ref.mounted) return;
+      state = MenuFilter(kataKunci: value, kategori: state.kategori);
+    });
   }
 
   void pilihKategori(KategoriMenu? kategori) {
