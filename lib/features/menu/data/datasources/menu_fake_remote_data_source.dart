@@ -6,7 +6,6 @@ import 'package:eatik_app/features/menu/data/models/menu_model.dart';
 class MenuFakeRemoteDataSource implements MenuRemoteDataSource {
   const MenuFakeRemoteDataSource({this.simulasiOffline = false});
 
-  /// Ubah menjadi true untuk melihat penanganan error pada UI.
   final bool simulasiOffline;
 
   static const List<Map<String, dynamic>> _json = [
