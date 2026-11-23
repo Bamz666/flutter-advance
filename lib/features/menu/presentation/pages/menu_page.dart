@@ -1,69 +1,36 @@
 import 'dart:async';
 
-import 'package:eatik_app/core/error/result.dart';
-import 'package:eatik_app/features/menu/data/datasources/menu_fake_remote_data_source.dart';
-import 'package:eatik_app/features/menu/data/repositories/menu_repository_impl.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
-import 'package:eatik_app/features/menu/domain/usecases/get_menus.dart';
+import 'package:eatik_app/features/menu/presentation/providers/favorit_menu_provider.dart';
+import 'package:eatik_app/features/menu/presentation/providers/menu_filter_provider.dart';
+import 'package:eatik_app/features/menu/presentation/providers/menu_list_provider.dart';
+import 'package:eatik_app/features/menu/presentation/providers/menu_list_state.dart';
 import 'package:eatik_app/features/menu/presentation/widgets/menu_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MenuPage extends StatefulWidget {
+class MenuPage extends ConsumerWidget {
   const MenuPage({super.key});
 
   @override
-  State<MenuPage> createState() => _MenuPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final menuState = ref.watch(menuListProvider);
 
-class _MenuPageState extends State<MenuPage> {
-  // Sementara: dependency dibuat langsung di sini (hard dependency).
-  // Akan dirapikan dengan Riverpod (Modul 2) dan DI (Modul 3).
-  final GetMenus _getMenus = const GetMenus(
-    MenuRepositoryImpl(MenuFakeRemoteDataSource()),
-  );
-
-  List<Menu> _menus = const [];
-  bool _sedangMemuat = true;
-  String? _pesanError;
-  String _kataKunci = '';
-  KategoriMenu? _kategori;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_muat());
-  }
-
-  Future<void> _muat() async {
-    setState(() {
-      _sedangMemuat = true;
-      _pesanError = null;
+    // ref.listen: efek samping (SnackBar) tanpa rebuild.
+    ref.listen(favoritMenuProvider, (previous, next) {
+      final bertambah = next.length > (previous?.length ?? 0);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 1),
+            content: Text(
+              bertambah ? 'Ditambahkan ke favorit' : 'Dihapus dari favorit',
+            ),
+          ),
+        );
     });
 
-    final hasil = await _getMenus(nama: _kataKunci, kategori: _kategori);
-
-    if (!mounted) return;
-    setState(() {
-      _sedangMemuat = false;
-      switch (hasil) {
-        case Success(:final data):
-          _menus = data;
-        case Failed(:final failure):
-          _pesanError = failure.message;
-      }
-    });
-  }
-
-  String _labelKategori(KategoriMenu? kategori) {
-    return switch (kategori) {
-      null => 'Semua',
-      KategoriMenu.makanan => 'Makanan',
-      KategoriMenu.minuman => 'Minuman',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Menu Eatik')),
       body: Column(
@@ -71,10 +38,8 @@ class _MenuPageState extends State<MenuPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
-              onChanged: (value) {
-                _kataKunci = value;
-                unawaited(_muat());
-              },
+              onChanged: (value) =>
+                  ref.read(menuFilterProvider.notifier).ubahKataKunci(value),
               decoration: InputDecoration(
                 hintText: 'Cari menu...',
                 prefixIcon: const Icon(Icons.search_rounded),
@@ -86,51 +51,84 @@ class _MenuPageState extends State<MenuPage> {
               ),
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                for (final kategori in [null, ...KategoriMenu.values])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(_labelKategori(kategori)),
-                      selected: _kategori == kategori,
-                      onSelected: (_) {
-                        setState(() => _kategori = kategori);
-                        unawaited(_muat());
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(child: _buildDaftar()),
+          const _KategoriChips(),
+          Expanded(child: _DaftarMenu(state: menuState)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildDaftar() {
-    if (_sedangMemuat) {
+/// Consumer terpisah dengan select: hanya chip yang di-rebuild
+/// saat kategori berubah.
+class _KategoriChips extends ConsumerWidget {
+  const _KategoriChips();
+
+  String _label(KategoriMenu? kategori) {
+    return switch (kategori) {
+      null => 'Semua',
+      KategoriMenu.makanan => 'Makanan',
+      KategoriMenu.minuman => 'Minuman',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final terpilih = ref.watch(
+      menuFilterProvider.select((filter) => filter.kategori),
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          for (final kategori in [null, ...KategoriMenu.values])
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(_label(kategori)),
+                selected: terpilih == kategori,
+                onSelected: (_) => ref
+                    .read(menuFilterProvider.notifier)
+                    .pilihKategori(kategori),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DaftarMenu extends ConsumerWidget {
+  const _DaftarMenu({required this.state});
+
+  final MenuListState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (state.sedangMemuat && state.menus.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final pesan = _pesanError;
+    final pesan = state.pesanError;
     if (pesan != null) {
-      return _PesanError(pesan: pesan, onCobaLagi: () => unawaited(_muat()));
+      return _PesanError(
+        pesan: pesan,
+        onCobaLagi: () =>
+            unawaited(ref.read(menuListProvider.notifier).muatUlang()),
+      );
     }
 
-    if (_menus.isEmpty) {
+    if (state.menus.isEmpty) {
       return const Center(child: Text('Menu tidak ditemukan'));
     }
 
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      itemCount: _menus.length,
+      itemCount: state.menus.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => MenuCard(menu: _menus[index]),
+      itemBuilder: (context, index) => MenuCard(menu: state.menus[index]),
     );
   }
 }
