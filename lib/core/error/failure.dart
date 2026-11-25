@@ -34,3 +34,7 @@ final class UnknownFailure extends Failure {
     super.message = 'Terjadi kesalahan yang tidak diketahui.',
   ]);
 }
+
+final class ValidationFailure extends Failure {
+  const ValidationFailure(super.message);
+}

@@ -1,5 +1,5 @@
+import 'package:eatik_app/app/auth_gate.dart';
 import 'package:eatik_app/app/theme/app_theme.dart';
-import 'package:eatik_app/features/menu/presentation/pages/menu_page.dart';
 import 'package:flutter/material.dart';
 
 class EatikApp extends StatelessWidget {
@@ -13,7 +13,7 @@ class EatikApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      home: const MenuPage(),
+      home: const AuthGate(),
     );
   }
 }
