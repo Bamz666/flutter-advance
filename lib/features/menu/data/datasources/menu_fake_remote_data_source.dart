@@ -99,4 +99,28 @@ class MenuFakeRemoteDataSource implements MenuRemoteDataSource {
       return cocokNama && cocokKategori;
     }).toList();
   }
+
+  @override
+  Future<MenuModel> createMenu({
+    required String nama,
+    required double harga,
+    required String kategori,
+    String? status,
+    String? deskripsi,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    return MenuModel(
+      id: 99,
+      nama: nama,
+      harga: harga,
+      kategori: kategori,
+      status: status,
+      deskripsi: deskripsi,
+    );
+  }
+
+  @override
+  Future<void> deleteMenu(int id) async {
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+  }
 }
