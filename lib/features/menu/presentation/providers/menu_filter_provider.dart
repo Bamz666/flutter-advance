@@ -36,6 +36,7 @@ class MenuFilterNotifier extends Notifier<MenuFilter> {
   }
 }
 
-final menuFilterProvider = NotifierProvider<MenuFilterNotifier, MenuFilter>(
-  MenuFilterNotifier.new,
-);
+final menuFilterProvider =
+    NotifierProvider.autoDispose<MenuFilterNotifier, MenuFilter>(
+      MenuFilterNotifier.new,
+    );

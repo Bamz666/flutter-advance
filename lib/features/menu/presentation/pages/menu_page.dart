@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:eatik_app/core/widgets/async_value_view.dart';
 import 'package:eatik_app/core/widgets/state_message.dart';
+import 'package:eatik_app/features/auth/presentation/widgets/logout_button.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
 import 'package:eatik_app/features/menu/presentation/menu_labels.dart';
+import 'package:eatik_app/features/menu/presentation/pages/menu_form_page.dart';
 import 'package:eatik_app/features/menu/presentation/providers/favorit_menu_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_filter_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_list_provider.dart';
@@ -22,6 +24,14 @@ class MenuPage extends ConsumerWidget {
         context: context,
         showDragHandle: true,
         builder: (context) => MenuDetailSheet(menuId: menuId),
+      ),
+    );
+  }
+
+  void _bukaFormTambah(BuildContext context) {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (context) => const MenuFormPage()),
       ),
     );
   }
@@ -47,7 +57,12 @@ class MenuPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu Eatik'),
-        actions: const [AntrianChip()],
+        actions: const [AntrianChip(), LogoutButton()],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _bukaFormTambah(context),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Tambah'),
       ),
       body: Column(
         children: [
@@ -83,7 +98,7 @@ class MenuPage extends ConsumerWidget {
                 ),
                 onRetry: () => ref.invalidate(menuListProvider),
                 builder: (daftar) => ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                   itemCount: daftar.length,
                   separatorBuilder: (context, index) =>
                       const SizedBox(height: 12),
