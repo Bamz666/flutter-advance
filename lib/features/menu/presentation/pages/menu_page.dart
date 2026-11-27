@@ -1,43 +1,58 @@
 import 'dart:async';
 
+import 'package:eatik_app/core/router/app_routes.dart';
 import 'package:eatik_app/core/widgets/async_value_view.dart';
 import 'package:eatik_app/core/widgets/state_message.dart';
-import 'package:eatik_app/features/auth/presentation/widgets/logout_button.dart';
 import 'package:eatik_app/features/menu/domain/entities/menu.dart';
 import 'package:eatik_app/features/menu/presentation/menu_labels.dart';
-import 'package:eatik_app/features/menu/presentation/pages/menu_form_page.dart';
 import 'package:eatik_app/features/menu/presentation/providers/favorit_menu_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_filter_provider.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_list_provider.dart';
 import 'package:eatik_app/features/menu/presentation/widgets/antrian_chip.dart';
 import 'package:eatik_app/features/menu/presentation/widgets/menu_card.dart';
-import 'package:eatik_app/features/menu/presentation/widgets/menu_detail_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class MenuPage extends ConsumerWidget {
-  const MenuPage({super.key});
+class MenuPage extends ConsumerStatefulWidget {
+  const MenuPage({this.kategoriAwal, super.key});
 
-  void _tampilkanDetail(BuildContext context, int menuId) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        builder: (context) => MenuDetailSheet(menuId: menuId),
-      ),
-    );
-  }
+  /// Dari query parameter, misalnya /menu?kategori=minuman.
+  final KategoriMenu? kategoriAwal;
 
-  void _bukaFormTambah(BuildContext context) {
-    unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (context) => const MenuFormPage()),
-      ),
-    );
+  @override
+  ConsumerState<MenuPage> createState() => _MenuPageState();
+}
+
+class _MenuPageState extends ConsumerState<MenuPage> {
+  @override
+  void initState() {
+    super.initState();
+    _terapkanKategoriAwal();
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void didUpdateWidget(MenuPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.kategoriAwal != widget.kategoriAwal) {
+      _terapkanKategoriAwal();
+    }
+  }
+
+  void _terapkanKategoriAwal() {
+    final kategori = widget.kategoriAwal;
+    if (kategori == null) return;
+
+    // Provider tidak boleh diubah saat widget sedang dibangun,
+    // jadi ditunda sampai frame selesai.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(menuFilterProvider.notifier).pilihKategori(kategori);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final menus = ref.watch(menuListProvider);
 
     ref.listen(favoritMenuProvider, (previous, next) {
@@ -57,10 +72,11 @@ class MenuPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu Eatik'),
-        actions: const [AntrianChip(), LogoutButton()],
+        actions: const [AntrianChip()],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _bukaFormTambah(context),
+        onPressed: () =>
+            unawaited(context.pushNamed<void>(AppRoute.menuTambah)),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Tambah'),
       ),
@@ -106,7 +122,13 @@ class MenuPage extends ConsumerWidget {
                     final menu = daftar[index];
                     return MenuCard(
                       menu: menu,
-                      onTap: () => _tampilkanDetail(context, menu.id),
+                      onTap: () => unawaited(
+                        context.pushNamed<void>(
+                          AppRoute.menuDetail,
+                          pathParameters: {'id': menu.id.toString()},
+                          extra: menu,
+                        ),
+                      ),
                     );
                   },
                 ),

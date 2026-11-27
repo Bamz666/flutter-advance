@@ -5,6 +5,7 @@ import 'package:eatik_app/features/menu/presentation/menu_labels.dart';
 import 'package:eatik_app/features/menu/presentation/providers/menu_list_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class MenuFormPage extends ConsumerStatefulWidget {
   const MenuFormPage({super.key});
@@ -48,7 +49,7 @@ class _MenuFormPageState extends ConsumerState<MenuFormPage> {
     if (!valid) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    final router = GoRouter.of(context);
 
     setState(() {
       _sedangMengirim = true;
@@ -71,7 +72,7 @@ class _MenuFormPageState extends ConsumerState<MenuFormPage> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Menu berhasil ditambahkan')),
       );
-      navigator.pop();
+      router.pop();
       return;
     }
 
